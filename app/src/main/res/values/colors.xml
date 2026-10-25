@@ -1,0 +1,6 @@
+<resources>
+    <color name="tv_background">#0F1016</color>
+    <color name="tv_surface">#181A24</color>
+    <color name="tv_accent">#E50914</color>
+    <color name="tv_focus_ring">#FFFFFF</color>
+</resources>
