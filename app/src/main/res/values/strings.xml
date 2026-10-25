@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">StreamTV</string>
+    <string name="menu_home">Home</string>
+    <string name="menu_movies">Movies</string>
+    <string name="menu_series">Series</string>
+    <string name="menu_live">Live TV</string>
+    <string name="menu_sports">Sports</string>
+    <string name="menu_settings">Settings</string>
+</resources>
