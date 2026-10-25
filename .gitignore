@@ -1,0 +1,14 @@
+# Local properties (stores private API keys, SDK paths)
+local.properties
+
+# Build artifacts
+.gradle/
+build/
+app/build/
+core/*/build/
+providers/*/build/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+.DS_Store
