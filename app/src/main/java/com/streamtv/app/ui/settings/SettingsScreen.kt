@@ -2,6 +2,7 @@ package com.streamtv.app.ui.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,6 +34,7 @@ import com.streamtv.app.ui.theme.TvPrimary
 import com.streamtv.app.ui.theme.TvSurfaceVariant
 import com.streamtv.app.ui.theme.TvTextPrimary
 import com.streamtv.app.ui.theme.TvTextSecondary
+import com.streamtv.providers.m3u.FreeIptvFeeds
 import com.streamtv.providers.m3u.M3uStreamProvider
 import com.streamtv.providers.tmdb.TmdbConfig
 import kotlinx.coroutines.launch
@@ -51,7 +53,19 @@ fun SettingsScreen(
             else "No playlist loaded (Defaulting to test demo channels)"
         )
     }
-    var isButtonFocused by remember { mutableStateOf(false) }
+
+    val loadRemoteFeed: (String, String) -> Unit = { feedName, feedUrl ->
+        coroutineScope.launch {
+            playlistStatus = "Loading $feedName..."
+            val res = m3uProvider.loadPlaylist(feedUrl)
+            if (res.isSuccess) {
+                playlistStatus = "Successfully loaded ${res.getOrNull()} channels from $feedName."
+                onPlaylistLoaded()
+            } else {
+                playlistStatus = "Failed to load $feedName: ${res.exceptionOrNull()?.message}"
+            }
+        }
+    }
 
     Column(
         modifier = modifier
@@ -97,13 +111,13 @@ fun SettingsScreen(
                         if (it.length > 8) "${it.take(4)}...${it.takeLast(4)}" else "****"
                     } ?: "****"
                     Text(
-                        text = "API Key: $masked (Source: local.properties / env)",
+                        text = "API Key: $masked (Configured in local.properties)",
                         fontSize = 13.sp,
                         color = TvTextSecondary
                     )
                 } else {
                     Text(
-                        text = "To enable real TMDB movie & series discovery, add 'tmdb.api.key=YOUR_KEY' in local.properties or export TMDB_API_KEY.",
+                        text = "To enable TMDB discovery, add 'tmdb.api.key=YOUR_KEY' in local.properties.",
                         fontSize = 13.sp,
                         color = TvTextSecondary
                     )
@@ -123,14 +137,14 @@ fun SettingsScreen(
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "M3U Live Playlist Parser",
+                        text = "Free Live Streaming TV Feeds",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         color = TvPrimary
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = if (m3uProvider.isLoaded) "● ${m3uProvider.totalChannels} CHANNELS" else "○ EMPTY",
+                        text = if (m3uProvider.isLoaded) "● ${m3uProvider.totalChannels} CHANNELS" else "○ READY",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (m3uProvider.isLoaded) Color(0xFF00E676) else Color(0xFFFF9800)
@@ -146,53 +160,93 @@ fun SettingsScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Surface(
-                    onClick = {
-                        coroutineScope.launch {
-                            playlistStatus = "Loading sample public test channels..."
-                            // Load sample verified public test broadcast M3U playlist
-                            val sampleM3u = """
-                                #EXTM3U x-tvg-url="https://iptv-org.github.io/epg/guides/us/tvguide.com.epg.xml"
-                                #EXTINF:-1 tvg-id="akamai.live" tvg-name="Akamai Live News" group-title="News",Akamai Live News HLS
-                                https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8
-                                #EXTINF:-1 tvg-id="unified.sports" tvg-name="Action Sports" group-title="Sports",Unified Sports Action 1080p
-                                https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8
-                                #EXTINF:-1 tvg-id="mux.animation" tvg-name="Big Buck Bunny TV" group-title="Animation",Big Buck Bunny 24/7
-                                https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8
-                            """.trimIndent()
-                            val tempFile = java.io.File.createTempFile("sample_test_playlist", ".m3u")
-                            tempFile.writeText(sampleM3u)
-                            val res = m3uProvider.loadPlaylist(tempFile.absolutePath)
-                            if (res.isSuccess) {
-                                playlistStatus = "Successfully loaded ${res.getOrNull()} channels from test M3U playlist."
-                                onPlaylistLoaded()
-                            } else {
-                                playlistStatus = "Failed to load: ${res.exceptionOrNull()?.message}"
-                            }
-                        }
-                    },
-                    modifier = Modifier
-                        .onFocusChanged { isButtonFocused = it.isFocused }
-                        .border(
-                            width = if (isButtonFocused) 2.dp else 0.dp,
-                            color = if (isButtonFocused) TvFocusBorder else Color.Transparent,
-                            shape = RoundedCornerShape(8.dp)
-                        ),
-                    shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
-                    colors = ClickableSurfaceDefaults.colors(
-                        containerColor = TvPrimary,
-                        focusedContainerColor = TvPrimary
-                    )
+                Text(
+                    text = "Select a Free Public Live TV Source:",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TvTextPrimary
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text(
-                        text = "Load Sample Verified Playlist",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        FeedButton(
+                            title = "📰 Global News (Live)",
+                            onClick = { loadRemoteFeed("Free Global News", FreeIptvFeeds.GLOBAL_NEWS) }
+                        )
+                        FeedButton(
+                            title = "⚽ Live Sports (HLS)",
+                            onClick = { loadRemoteFeed("Free Live Sports", FreeIptvFeeds.SPORTS) }
+                        )
+                        FeedButton(
+                            title = "🎬 Movie Channels (24/7)",
+                            onClick = { loadRemoteFeed("Free Movies & Cinema", FreeIptvFeeds.MOVIES) }
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        FeedButton(
+                            title = "🚀 Science & Tech TV",
+                            onClick = { loadRemoteFeed("Science & Space TV", "https://iptv-org.github.io/iptv/categories/science.m3u") }
+                        )
+                        FeedButton(
+                            title = "🇬🇧 English Free-To-Air",
+                            onClick = { loadRemoteFeed("English Channels", FreeIptvFeeds.ENGLISH_ALL) }
+                        )
+                        FeedButton(
+                            title = "⚡ Verified 24/7 Feeds",
+                            onClick = {
+                                m3uProvider.loadDefaultVerifiedFeeds()
+                                playlistStatus = "Loaded ${m3uProvider.totalChannels} verified 24/7 test broadcast channels."
+                                onPlaylistLoaded()
+                            }
+                        )
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun FeedButton(
+    title: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var isFocused by remember { mutableStateOf(false) }
+
+    Surface(
+        onClick = onClick,
+        modifier = modifier
+            .onFocusChanged { isFocused = it.isFocused }
+            .border(
+                width = if (isFocused) 2.dp else 0.dp,
+                color = if (isFocused) TvFocusBorder else Color.Transparent,
+                shape = RoundedCornerShape(8.dp)
+            ),
+        shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = TvPrimary,
+            focusedContainerColor = TvPrimary
+        )
+    ) {
+        Text(
+            text = title,
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
+        )
     }
 }
