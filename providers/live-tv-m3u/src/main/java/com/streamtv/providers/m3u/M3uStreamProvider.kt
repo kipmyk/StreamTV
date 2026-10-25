@@ -9,6 +9,13 @@ import com.streamtv.providers.api.StreamProvider
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+object FreeIptvFeeds {
+    const val GLOBAL_NEWS = "https://iptv-org.github.io/iptv/categories/news.m3u"
+    const val SPORTS = "https://iptv-org.github.io/iptv/categories/sports.m3u"
+    const val MOVIES = "https://iptv-org.github.io/iptv/categories/movies.m3u"
+    const val ENGLISH_ALL = "https://iptv-org.github.io/iptv/languages/eng.m3u"
+}
+
 class M3uStreamProvider(
     private val networkClient: NetworkClient = NetworkClient(),
     private val parser: M3uParser = M3uParser(),
@@ -28,6 +35,33 @@ class M3uStreamProvider(
 
     val totalChannels: Int
         get() = channelMap.size
+
+    init {
+        // Pre-populate with verified reliable live channels
+        loadDefaultVerifiedFeeds()
+    }
+
+    fun loadDefaultVerifiedFeeds() {
+        FreeLiveTvApi.VERIFIED_DEFAULT_CHANNELS.forEach { item ->
+            val entry = M3uEntry(
+                id = item.id,
+                name = item.title,
+                streamUrl = item.directStreamUrl ?: "",
+                groupTitle = item.groupTitle ?: item.category,
+                tvgLogo = item.posterUrl
+            )
+            channelMap[item.id] = entry
+        }
+        currentSource = "Verified Public Broadcasts"
+    }
+
+    suspend fun loadFreeFeed(feed: FreeLiveFeed): Result<Int> {
+        val result = loadPlaylist(feed.m3uUrl)
+        if (result.isFailure && channelMap.isEmpty()) {
+            loadDefaultVerifiedFeeds()
+        }
+        return result
+    }
 
     suspend fun loadPlaylist(source: String): Result<Int> {
         val result = networkClient.get(source)
