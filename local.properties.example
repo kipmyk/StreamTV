@@ -1,0 +1,7 @@
+# TMDB API Key (v3 auth)
+# Get a free key at: https://www.themoviedb.org/settings/api
+# Copy this file to local.properties and add your key:
+tmdb.api.key=YOUR_TMDB_API_KEY_HERE
+
+# Alternatively, export TMDB_API_KEY in your shell environment:
+# export TMDB_API_KEY="your_api_key_here"
